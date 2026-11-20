@@ -1,0 +1,432 @@
+﻿"Archivo","Ruta","Codigo"
+"Principal.java","src\Principal.java","
+import modelo.Producto;
+import modelo.Bebida;
+import modelo.Comida;
+import persistencia.ConexionBD;
+import servicios.ReglaDescuento;
+import servicios.ServicioDescuento;
+import vista.VentanaCafeteria;
+import javax.swing.SwingUtilities;
+
+public class Principal {
+
+    public static void main(String[] args) {
+
+        // Probar conexion al iniciar la aplicacion
+System.out.println(""=== CONEXION A BASE DE DATOS ==="");
+
+System.out.println(ConexionBD.probarConexion());
+
+System.out.println(""----------------------"");
+
+        // Crear productos de la cafetería
+        Producto bebida = new Bebida(""Jugo natural"", 8.0);
+        Producto comida = new Comida(""Sándwich"", 12.0);
+
+        // Demostrar herencia y polimorfismo
+        System.out.println(""=== CAFETERÍA ==="");
+
+        System.out.println(
+            bebida.getTipo() + "": "" + bebida.getNombre()
+        );
+
+        System.out.println(
+            comida.getTipo() + "": "" + comida.getNombre()
+        );
+
+        // Calcular total del pedido
+        double total = bebida.getPrecio()
+                     + comida.getPrecio();
+
+        // Expresión lambda para calcular el descuento
+        ReglaDescuento regla = monto ->
+            monto > 10.0 ? monto * 0.15 : 0.0;
+
+        // Crear el servicio de descuentos
+        ServicioDescuento servicio =
+            new ServicioDescuento(regla);
+
+        // Calcular valores
+        double descuento =
+            servicio.calcularDescuento(total);
+
+        double totalFinal =
+            servicio.calcularTotalFinal(total);
+
+        // Mostrar resultados
+        System.out.println(""----------------------"");
+
+        System.out.printf(""Total: $%.2f%n"", total);
+
+        System.out.printf(
+            ""Descuento: $%.2f%n"", descuento
+        );
+
+        System.out.printf(
+            ""Total final: $%.2f%n"", totalFinal
+        );
+
+        // Probar un pedido sin descuento
+        double pedidoPequeno = 10.0;
+
+        System.out.println(""----------------------"");
+        System.out.println(""Prueba sin descuento:"");
+
+        System.out.printf(
+            ""Total final: $%.2f%n"",
+            servicio.calcularTotalFinal(pedidoPequeno)
+        );
+
+        // Iniciar la interfaz grafica
+    SwingUtilities.invokeLater(() -> {
+    VentanaCafeteria ventana = new VentanaCafeteria();
+    ventana.setVisible(true);
+        });
+    }
+}
+"
+"Bebida.java","src\modelo\Bebida.java","
+package modelo;
+
+public class Bebida extends Producto {
+
+    public Bebida(String nombre, double precio) {
+        super(nombre, precio);
+    }
+
+    @Override
+    public String getTipo() {
+        return ""Bebida"";
+    }
+}
+"
+"Comida.java","src\modelo\Comida.java","
+package modelo;
+
+public class Comida extends Producto {
+
+    public Comida(String nombre, double precio) {
+        super(nombre, precio);
+    }
+
+    @Override
+    public String getTipo() {
+        return ""Comida"";
+    }
+}
+"
+"Producto.java","src\modelo\Producto.java","package modelo;
+
+public abstract class Producto {
+
+    private String nombre;
+    private double precio;
+
+    public Producto(String nombre, double precio) {
+        if (nombre == null || nombre.trim().isEmpty()) {
+            throw new IllegalArgumentException(
+                ""El nombre no puede estar vacío""
+            );
+        }
+
+        if (!Double.isFinite(precio) || precio < 0) {
+            throw new IllegalArgumentException(
+                ""El precio debe ser un valor válido""
+            );
+        }
+
+        this.nombre = nombre;
+        this.precio = precio;
+    }
+
+    public String getNombre() {
+        return nombre;
+    }
+
+    public double getPrecio() {
+        return precio;
+    }
+
+    public abstract String getTipo();
+}
+
+"
+"ConexionBD.java","src\persistencia\ConexionBD.java","
+package persistencia;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+public class ConexionBD {
+
+    private static final String URL =
+        ""jdbc:sqlite:datos/cafeteria.db"";
+
+    public static String probarConexion() {
+
+        try {
+            // Cargar el controlador JDBC
+            Class.forName(""org.sqlite.JDBC"");
+
+            // Abrir la conexion y realizar una consulta
+            try (
+                Connection conexion =
+                    DriverManager.getConnection(URL);
+
+                Statement sentencia =
+                    conexion.createStatement();
+
+                ResultSet resultado =
+                    sentencia.executeQuery(""SELECT 1"")
+            ) {
+
+                if (resultado.next()) {
+                    return ""CONEXION EXITOSA CON SQLITE\n""
+                         + ""Base de datos: datos/cafeteria.db"";
+                }
+
+                return ""Conexion establecida sin resultados."";
+
+            }
+
+        } catch (ClassNotFoundException e) {
+
+            return ""ERROR: No se encontro el driver JDBC.\n""
+                 + ""Detalle: "" + e.getMessage();
+
+        } catch (SQLException e) {
+
+            return ""ERROR: No fue posible conectar con SQLite.\n""
+                 + ""Detalle: "" + e.getMessage();
+        }
+    }
+}
+"
+"ReglaDescuento.java","src\servicios\ReglaDescuento.java","
+package servicios;
+
+@FunctionalInterface
+public interface ReglaDescuento {
+
+    double calcularDescuento(double total);
+
+}
+"
+"ServicioDescuento.java","src\servicios\ServicioDescuento.java","
+package servicios;
+
+public class ServicioDescuento {
+
+    private final ReglaDescuento regla;
+
+    public ServicioDescuento(ReglaDescuento regla) {
+        if (regla == null) {
+            throw new IllegalArgumentException(
+                ""La regla de descuento no puede ser nula""
+            );
+        }
+
+        this.regla = regla;
+    }
+
+    public double calcularDescuento(double total) {
+
+        validarTotal(total);
+
+        double descuento = regla.calcularDescuento(total);
+
+        if (!Double.isFinite(descuento)
+                || descuento < 0 || descuento > total) {
+            throw new IllegalArgumentException(
+                ""El descuento calculado no es válido""
+            );
+        }
+
+        return descuento;
+    }
+
+    public double calcularTotalFinal(double total) {
+
+        return total - calcularDescuento(total);
+    }
+
+    private void validarTotal(double total) {
+
+        if (!Double.isFinite(total) || total < 0) {
+            throw new IllegalArgumentException(
+                ""El total debe ser un valor válido""
+            );
+        }
+    }
+}
+"
+"VentanaCafeteria.java","src\vista\VentanaCafeteria.java","
+package vista;
+
+import javax.swing.*;
+import java.awt.*;
+
+import persistencia.ConexionBD;
+import servicios.ReglaDescuento;
+import servicios.ServicioDescuento;
+
+public class VentanaCafeteria extends JFrame {
+
+    private final JTextField campoMonto;
+    private final JButton botonCalcular;
+    private final JTextArea areaResultados;
+    private final ServicioDescuento servicio;
+
+    public VentanaCafeteria() {
+
+        ReglaDescuento regla = monto ->
+            monto > 10.0 ? monto * 0.15 : 0.0;
+
+        servicio = new ServicioDescuento(regla);
+
+        setTitle(""Sistema de Descuentos - Cafeteria"");
+        setSize(600, 400);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        JPanel panelPrincipal =
+            new JPanel(new BorderLayout(10, 10));
+
+        panelPrincipal.setBorder(
+            BorderFactory.createEmptyBorder(15, 15, 15, 15)
+        );
+
+        JLabel titulo =
+            new JLabel(""SISTEMA DE DESCUENTOS"");
+
+        titulo.setFont(new Font(
+            ""Arial"", Font.BOLD, 20
+        ));
+
+        titulo.setHorizontalAlignment(
+            SwingConstants.CENTER
+        );
+
+        panelPrincipal.add(titulo, BorderLayout.NORTH);
+
+        JPanel panelCentral =
+            new JPanel(new BorderLayout(10, 10));
+
+        JPanel panelEntrada =
+            new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+        JLabel etiquetaMonto =
+            new JLabel(""Total del pedido: $"");
+
+        campoMonto = new JTextField(12);
+
+        botonCalcular =
+            new JButton(""Calcular Descuento"");
+
+        panelEntrada.add(etiquetaMonto);
+        panelEntrada.add(campoMonto);
+        panelEntrada.add(botonCalcular);
+
+        panelCentral.add(
+            panelEntrada, BorderLayout.NORTH
+        );
+
+        areaResultados = new JTextArea();
+        areaResultados.setEditable(false);
+        areaResultados.setFont(
+            new Font(""Monospaced"", Font.PLAIN, 14)
+        );
+
+        panelCentral.add(
+            new JScrollPane(areaResultados),
+            BorderLayout.CENTER
+        );
+
+        panelPrincipal.add(
+            panelCentral, BorderLayout.CENTER
+        );
+
+        setContentPane(panelPrincipal);
+
+        botonCalcular.addActionListener(
+            e -> calcularDescuento()
+        );
+
+        campoMonto.addActionListener(
+            e -> calcularDescuento()
+        );
+
+        // Verificar SQLite al iniciar la ventana
+        areaResultados.append(
+            ""=== ESTADO DE LA BASE DE DATOS ===\n""
+        );
+
+        areaResultados.append(
+            ConexionBD.probarConexion() + ""\n\n""
+        );
+    }
+
+    private void calcularDescuento() {
+
+        try {
+
+            String entrada = campoMonto.getText()
+                .trim().replace("","", ""."");
+
+            double total = Double.parseDouble(entrada);
+
+            if (!Double.isFinite(total) || total < 0) {
+                throw new IllegalArgumentException(
+                    ""Ingrese un monto válido no negativo.""
+                );
+            }
+
+            double descuento =
+                servicio.calcularDescuento(total);
+
+            double totalFinal =
+                servicio.calcularTotalFinal(total);
+
+            areaResultados.append(
+                ""=== RESULTADO DEL PEDIDO ===\n""
+            );
+
+            areaResultados.append(
+                String.format(""Total: $%.2f%n"", total)
+            );
+
+            areaResultados.append(
+                String.format(
+                    ""Descuento: $%.2f%n"", descuento
+                )
+            );
+
+            areaResultados.append(
+                String.format(
+                    ""Total final: $%.2f%n"", totalFinal
+                )
+            );
+
+            areaResultados.append(
+                ""------------------------------\n""
+            );
+
+        } catch (NumberFormatException ex) {
+
+            areaResultados.append(
+                ""ERROR: Ingrese un número válido.\n""
+            );
+
+        } catch (IllegalArgumentException ex) {
+
+            areaResultados.append(
+                ""ERROR: "" + ex.getMessage() + ""\n""
+            );
+        }
+    }
+}
+"
